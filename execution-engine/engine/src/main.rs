@@ -1,11 +1,10 @@
 // third-party dependencies
 extern crate clap;
-#[macro_use]
-extern crate lazy_static;
-
 // internal dependencies
 extern crate common;
 extern crate execution_engine;
+#[macro_use]
+extern crate lazy_static;
 extern crate shared;
 extern crate storage;
 extern crate wasm_prep;
@@ -18,10 +17,10 @@ use std::iter::Iterator;
 
 use clap::{App, Arg, ArgMatches};
 
+use execution_engine::engine_state::EngineState;
 use execution_engine::engine_state::error::RootNotFound;
 use execution_engine::engine_state::execution_effect::ExecutionEffect;
 use execution_engine::engine_state::execution_result::ExecutionResult;
-use execution_engine::engine_state::EngineState;
 use execution_engine::execution::WasmiExecutor;
 use shared::init::mocked_account;
 use shared::logging;
@@ -29,9 +28,9 @@ use shared::logging::log_level::LogLevel;
 use shared::logging::log_settings;
 use shared::logging::log_settings::{LogLevelFilter, LogSettings};
 use shared::newtypes::Blake2bHash;
-use storage::global_state::in_memory::InMemoryGlobalState;
 use storage::global_state::CommitResult;
 use storage::global_state::History;
+use storage::global_state::in_memory::InMemoryGlobalState;
 use wasm_prep::{wasm_costs::WasmCosts, WasmiPreprocessor};
 
 // exe / proc
@@ -250,7 +249,9 @@ fn main() {
                 let (log_level, error_message, mut new_properties, new_state_hash) =
                     apply_effects(&engine_state, &state_hash, effects);
 
-                new_state_hash.map(|hash| state_hash = hash);
+                if let Some(hash) = new_state_hash {
+                    state_hash = hash;
+                };
 
                 properties.append(&mut new_properties);
                 log_message(log_level, error_message, properties);
@@ -266,7 +267,9 @@ fn main() {
                 let (new_log_level, new_error_message, mut new_properties, new_state_hash) =
                     apply_effects(&engine_state, &state_hash, effects);
 
-                new_state_hash.map(|hash| state_hash = hash);
+                if let Some(hash) = new_state_hash {
+                    state_hash = hash;
+                };
 
                 new_properties.append(&mut properties.clone());
                 log_message(new_log_level, new_error_message, new_properties);

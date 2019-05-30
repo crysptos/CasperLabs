@@ -15,14 +15,10 @@ use wasmi::{
     ModuleRef, RuntimeArgs, RuntimeValue, Trap,
 };
 
+use args::Args;
 use common::bytesrepr::{deserialize, Error as BytesReprError, ToBytes};
 use common::key::{AccessRights, Key};
 use common::value::Value;
-use shared::newtypes::Validated;
-use shared::transform::TypeMismatch;
-use storage::global_state::StateReader;
-
-use args::Args;
 use engine_state::execution_result::ExecutionResult;
 use functions::{
     ADD_FUNC_INDEX, ADD_UREF_FUNC_INDEX, CALL_CONTRACT_FUNC_INDEX, GAS_FUNC_INDEX,
@@ -35,6 +31,9 @@ use resolvers::create_module_resolver;
 use resolvers::error::ResolverError;
 use resolvers::memory_resolver::MemoryResolver;
 use runtime_context::RuntimeContext;
+use shared::newtypes::Validated;
+use shared::transform::TypeMismatch;
+use storage::global_state::StateReader;
 use tracking_copy::TrackingCopy;
 use URefAddr;
 
@@ -915,20 +914,24 @@ pub fn key_to_tuple(key: Key) -> Option<([u8; 32], AccessRights)> {
 
 #[cfg(test)]
 mod tests {
-    use super::Error;
-    use common::key::Key;
-    use common::value::{Account, Value};
-    use engine_state::execution_effect::ExecutionEffect;
-    use engine_state::execution_result::ExecutionResult;
-    use execution::{Executor, WasmiExecutor};
-    use parity_wasm::builder::ModuleBuilder;
-    use parity_wasm::elements::{External, ImportEntry, MemoryType, Module};
     use std::cell::RefCell;
     use std::collections::btree_map::BTreeMap;
     use std::collections::HashMap;
     use std::rc::Rc;
+
+    use parity_wasm::builder::ModuleBuilder;
+    use parity_wasm::elements::{External, ImportEntry, MemoryType, Module};
+
+    use common::key::Key;
+    use common::value::{Account, Value};
+    use common::value::account::{AssociatedKeys, PublicKey, Weight};
+    use engine_state::execution_effect::ExecutionEffect;
+    use engine_state::execution_result::ExecutionResult;
+    use execution::{Executor, WasmiExecutor};
     use storage::global_state::StateReader;
     use tracking_copy::TrackingCopy;
+
+    use super::Error;
 
     fn on_fail_charge_test_helper<T>(
         f: impl Fn() -> Result<T, Error>,
@@ -991,6 +994,7 @@ mod tests {
     fn invalid_nonce_no_cost_effect() {
         let init_nonce = 1u64;
         let invalid_nonce = init_nonce + 2;
+        let account_address = [0u8; 32];
         struct DummyReader;
         impl StateReader<Key, Value> for DummyReader {
             type Error = ::storage::error::Error;
@@ -1000,13 +1004,17 @@ mod tests {
                     Key::Account(pub_key) => *pub_key,
                     _ => panic!("Key must be of an Account type"),
                 };
-                let acc = Account::new(pub_key, 1, BTreeMap::new());
+                let acc = Account::new(
+                    pub_key,
+                    1,
+                    BTreeMap::new(),
+                    AssociatedKeys::new(PublicKey::new([0u8; 32]), Weight::new(1)),
+                );
                 Ok(Some(Value::Account(acc)))
             }
         }
 
         let executor = WasmiExecutor;
-        let account_address = [0u8; 32];
         let parity_module: Module = ModuleBuilder::new()
             .with_import(ImportEntry::new(
                 "env".to_string(),
